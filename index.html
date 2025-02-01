@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=595, height=842, initial-scale=1.0" />
+    <title>.-':_,^=;+!r</title>
+    <script src="p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js-svg/1.0.1/p5.svg.min.js"></script>
+    <script src="voronoi.js"></script>
+
+    <script defer>
+      let doShowPoints = true,
+        spirale = false,
+        drawOrganic = false,
+        drawSimmetric = false,
+        doClip = true,
+        HSL = false;
+      let gridSize = 15,
+        strokedim = 1,
+        centerLimit = 20,
+        ellipsesize = 10;
+      let adjustWidth = 650,
+        adjustHeight = 920;
+      let gradientMode = false,
+        randomEllipseEnabled = false,
+        randomEllipseFactor = 5;
+      let gradientSteps = 10;
+      let sites = [];
+      let voronoi,
+        diagram = null,
+        bbox;
+
+      function setup() {
+        createCanvas(innerWidth, innerHeight * 1.2, "svg");
+        pixelDensity(1);
+        smooth();
+
+        voronoi = new Voronoi();
+        document.getElementById("savePNG").addEventListener("click", exportPNG);
+        document.getElementById("saveSVG").addEventListener("click", exportSVG);
+      }
+
+      function draw() {
+        gridSize = Number(document.getElementById("gridSize").value);
+        strokedim = Number(document.getElementById("strokeWeight").value);
+        ellipsesize = Number(document.getElementById("ellipseSize").value);
+        adjustWidth = Number(document.getElementById("drawingWidth").value);
+        adjustHeight = Number(document.getElementById("drawingHeight").value);
+        gradientSteps = Number(document.getElementById("gradientSteps").value);
+        HSL = document.getElementById("hslMode").checked;
+        gradientMode = document.getElementById("gradientMode").checked;
+        drawSimmetric = document.getElementById("symmetric").checked;
+        drawOrganic = document.getElementById("organic").checked;
+
+        doShowPoints = document.getElementById("showPoints").checked;
+        randomEllipseEnabled = document.getElementById("randomEllipse").checked;
+
+        bbox = { xl: 10, yt: 10, xr: 10 + adjustWidth, yb: 10 + adjustHeight };
+
+        background(255);
+        let bgCol = document.getElementById("backgroundColor").value;
+        push();
+        if (HSL) {
+          colorMode(HSB, 360, 100, 100);
+          let c = color(bgCol);
+          fill(hue(c), saturation(c), brightness(c));
+        } else {
+          colorMode(RGB, 255, 255, 255);
+          fill(bgCol);
+        }
+        noStroke();
+        rect(bbox.xl, bbox.yt, adjustWidth, adjustHeight);
+        pop();
+
+        stroke(document.getElementById("lineColor").value);
+        noFill();
+        rect(bbox.xl, bbox.yt, adjustWidth, adjustHeight);
+
+        if (sites.length > 0) {
+          diagram = voronoi.compute(sites, bbox);
+          if (gradientMode) {
+            for (let cell of diagram.cells) {
+              if (!cell.halfedges || cell.halfedges.length === 0) continue;
+              drawCellGradientDefault(cell);
+            }
+          } else {
+            for (let cell of diagram.cells) {
+              if (!cell.halfedges || cell.halfedges.length === 0) continue;
+              drawCellDefault(cell);
+            }
+          }
+        }
+      }
+
+      function drawCellDefault(cell) {
+        stroke(document.getElementById("lineColor").value);
+        strokeWeight(strokedim);
+        noFill();
+        beginShape();
+        for (let he of cell.halfedges) {
+          let p = he.getStartpoint();
+          vertex(p.x, p.y);
+        }
+        endShape(CLOSE);
+        if (doShowPoints) {
+          noStroke();
+          let size = ellipsesize;
+          if (randomEllipseEnabled) {
+            size = cell.site.size ? cell.site.size : ellipsesize;
+          }
+          fill(document.getElementById("fillColor").value);
+          ellipse(cell.site.x, cell.site.y, size, size);
+        }
+      }
+
+      function drawCellGradientDefault(cell) {
+        let pts = [];
+        for (let he of cell.halfedges) {
+          let p = he.getStartpoint();
+          pts.push(createVector(p.x, p.y));
+        }
+        if (pts.length === 0) return;
+        let cx = 0,
+          cy = 0;
+        for (let p of pts) {
+          cx += p.x;
+          cy += p.y;
+        }
+        cx /= pts.length;
+        cy /= pts.length;
+        let steps = gradientSteps;
+        for (let i = steps; i >= 1; i--) {
+          let t = i / steps;
+          let scaledPts = pts.map((p) =>
+            createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
+          );
+          if (HSL) {
+            colorMode(HSB, 360, 100, 100);
+            let hueVal = map(t, 0, 1, 360, 0);
+            fill(hueVal, 80, 90);
+            stroke(0);
+          } else {
+            noFill();
+            colorMode(RGB, 255, 255, 255);
+            let c1 = color(document.getElementById("fillColor").value);
+            let c2 = color(document.getElementById("lineColor").value);
+            let col = lerpColor(c1, c2, 1 - t);
+            stroke(col);
+          }
+          beginShape();
+          for (let p of scaledPts) {
+            vertex(p.x, p.y);
+          }
+          endShape(CLOSE);
+        }
+        stroke(document.getElementById("lineColor").value);
+        noFill();
+        beginShape();
+        for (let p of pts) {
+          vertex(p.x, p.y);
+        }
+        endShape(CLOSE);
+      }
+
+      function renderExportDrawing(g) {
+        let bboxExport = { xl: 0, yt: 0, xr: adjustWidth, yb: adjustHeight };
+        g.background(document.getElementById("backgroundColor").value);
+        g.push();
+        if (HSL) {
+          g.colorMode(HSB, 360, 100, 100);
+          let c = color(document.getElementById("backgroundColor").value);
+          g.fill(hue(c), saturation(c), brightness(c));
+        } else {
+          g.colorMode(RGB, 255, 255, 255);
+          g.fill(document.getElementById("backgroundColor").value);
+        }
+        g.noStroke();
+        g.rect(bboxExport.xl, bboxExport.yt, adjustWidth, adjustHeight);
+        g.pop();
+        g.stroke(document.getElementById("lineColor").value);
+        noFill();
+        g.rect(bboxExport.xl, bboxExport.yt, adjustWidth, adjustHeight);
+
+        let exportSites = sites.map((s) => ({
+          x: s.x - 50,
+          y: s.y - 50,
+          size: s.size,
+        }));
+        let exportDiagram = voronoi.compute(exportSites, bboxExport);
+        if (exportSites.length > 0) {
+          if (gradientMode) {
+            for (let cell of exportDiagram.cells) {
+              if (!cell.halfedges || cell.halfedges.length === 0) continue;
+              drawCellGradientOnContext(cell, g);
+            }
+          } else {
+            for (let cell of exportDiagram.cells) {
+              if (!cell.halfedges || cell.halfedges.length === 0) continue;
+              drawCellOnContext(cell, g);
+            }
+          }
+        }
+      }
+
+      function drawCellOnContext(cell, g) {
+        g.stroke(document.getElementById("lineColor").value);
+        g.strokeWeight(strokedim);
+        g.noFill();
+        g.beginShape();
+        for (let he of cell.halfedges) {
+          let p = he.getStartpoint();
+          g.vertex(p.x, p.y);
+        }
+        g.endShape(CLOSE);
+        if (doShowPoints) {
+          g.noStroke();
+          let size = ellipsesize;
+          if (randomEllipseEnabled) {
+            size = cell.site.size ? cell.site.size : ellipsesize;
+          }
+          g.fill(document.getElementById("fillColor").value);
+          g.ellipse(cell.site.x, cell.site.y, size, size);
+        }
+      }
+
+      function drawCellGradientOnContext(cell, g) {
+        let pts = [];
+        for (let he of cell.halfedges) {
+          let p = he.getStartpoint();
+          pts.push(createVector(p.x, p.y));
+        }
+        if (pts.length === 0) return;
+        let cx = 0,
+          cy = 0;
+        for (let p of pts) {
+          cx += p.x;
+          cy += p.y;
+        }
+        cx /= pts.length;
+        cy /= pts.length;
+        let steps = gradientSteps;
+        for (let i = steps; i >= 1; i--) {
+          let t = i / steps;
+          let scaledPts = pts.map((p) =>
+            createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
+          );
+          if (HSL) {
+            g.colorMode(HSB, 360, 100, 100);
+            let hueVal = map(t, 0, 1, 360, 0);
+            g.fill(hueVal, 80, 90);
+            g.stroke(0);
+          } else {
+            g.noFill();
+            g.colorMode(RGB, 255, 255, 255);
+            let c1 = color(document.getElementById("fillColor").value);
+            let c2 = color(document.getElementById("lineColor").value);
+            let col = lerpColor(c1, c2, 1 - t);
+            g.stroke(col);
+          }
+          g.beginShape();
+          for (let p of scaledPts) {
+            g.vertex(p.x, p.y);
+          }
+          g.endShape(CLOSE);
+        }
+        g.stroke(document.getElementById("lineColor").value);
+        g.noFill();
+        g.beginShape();
+        for (let p of pts) {
+          g.vertex(p.x, p.y);
+        }
+        g.endShape(CLOSE);
+      }
+
+      function addPoint(x, y, stickToGrid = true) {
+        let pt = createVector(x, y);
+        if (stickToGrid) {
+          pt.x = round(pt.x / gridSize) * gridSize;
+          pt.y = round(pt.y / gridSize) * gridSize;
+        }
+        if (doClip) {
+          if (
+            pt.x < bbox.xl ||
+            pt.x > bbox.xr ||
+            pt.y < bbox.yt ||
+            pt.y > bbox.yb
+          )
+            return;
+        }
+        for (let s of sites) {
+          if (dist(pt.x, pt.y, s.x, s.y) < 10) return;
+        }
+        let sizeVal = randomEllipseEnabled
+          ? random(ellipsesize, ellipsesize * randomEllipseFactor)
+          : ellipsesize;
+        sites.push({ x: pt.x, y: pt.y, size: sizeVal });
+      }
+
+      function addSymmetricPoint(x, y, stickToGrid = true) {
+        addPoint(x, y, stickToGrid);
+        let axis = bbox.xl + adjustWidth / 2;
+        let mirrorX = 2 * axis - x;
+        addPoint(mirrorX, y, stickToGrid);
+      }
+
+      function generateSpiral(cx, cy) {
+        let maxTheta = Number(document.getElementById("spiralMaxTheta").value);
+        let spiralScale = Number(document.getElementById("spiralScale").value);
+        let step = 0.1;
+        for (let theta = 0; theta < maxTheta; theta += step) {
+          let r = spiralScale * theta;
+          let x = cx + r * cos(theta);
+          let y = cy + r * sin(theta);
+          addPoint(x, y);
+        }
+      }
+
+      function mouseDragged() {
+        if (spirale) {
+          generateSpiral(mouseX, mouseY);
+        } else {
+          let stickToGrid = !drawOrganic;
+          if (drawSimmetric) {
+            addSymmetricPoint(mouseX, mouseY, stickToGrid);
+          } else {
+            addPoint(mouseX, mouseY, stickToGrid);
+          }
+        }
+      }
+
+      function mousePressed() {
+        let stickToGrid = !drawOrganic;
+        if (drawSimmetric) {
+          addSymmetricPoint(mouseX, mouseY, stickToGrid);
+        } else {
+          addPoint(mouseX, mouseY, stickToGrid);
+        }
+      }
+
+      function keyPressed() {
+        if (key === "!") {
+          for (let k = 0; k < width; k += gridSize) {
+            addPoint(k, random(100, 400));
+            addPoint(k, random(350, 400));
+            addPoint(k, random(350, 650));
+          }
+        }
+        if (key === "1") {
+          for (let k = 0; k < width; k += gridSize) {
+            addPoint(k, bbox.yt + adjustHeight - gridSize);
+          }
+        }
+        if (key === "2") {
+          for (let k = 0; k < height; k += gridSize) {
+            addPoint(bbox.xl + adjustWidth - gridSize, k);
+          }
+        }
+        if (key === "s") {
+          generateSpiral(mouseX, mouseY);
+        }
+        if (key === "c" || key === "r") {
+          sites = [];
+          background(255);
+        }
+      }
+
+      function exportPNG() {
+        let exportG = createGraphics(adjustWidth, adjustHeight);
+        exportG.pixelDensity(1);
+        exportG.smooth();
+        renderExportDrawing(exportG);
+        save(exportG, "grid.png");
+      }
+
+      function exportSVG() {
+        let exportG = createGraphics(adjustWidth, adjustHeight, "svg");
+        exportG.pixelDensity(1);
+        exportG.smooth();
+        renderExportDrawing(exportG);
+        save(exportG, "grid.svg");
+      }
+    </script>
+  </head>
+  <body>
+    <nav>
+      A toolkit to draw posters, originally designed for the
+      <a
+        href="https://giacomo.website/ababo"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Academy of Fine Arts of Bologna</a
+      >
+    </nav>
+    <div id="controls-container">
+      <div id="controls">
+        <div>
+          <label for="gridSize">Grid Size:</label>
+          <input type="range" id="gridSize" min="10" max="130" value="15" />
+        </div>
+        <div>
+          <label for="strokeWeight">Stroke Weight:</label>
+          <input type="range" id="strokeWeight" min="1" max="30" value="1" />
+        </div>
+        <div>
+          <label for="ellipseSize">Ellipse Size:</label>
+          <input type="range" id="ellipseSize" min="1" max="100" value="10" />
+        </div>
+        <div>
+          <label for="drawingWidth">Drawing Area Width:</label>
+          <input
+            type="range"
+            id="drawingWidth"
+            min="50"
+            max="650"
+            value="650"
+          />
+        </div>
+        <div>
+          <label for="drawingHeight">Drawing Area Height:</label>
+          <input
+            type="range"
+            id="drawingHeight"
+            min="50"
+            max="920"
+            value="920"
+          />
+        </div>
+        <div>
+          <label for="gradientSteps">Gradient Steps:</label>
+          <input type="range" id="gradientSteps" min="2" max="20" value="10" />
+        </div>
+        <div>
+          <label for="gradientMode">Gradient Mode:</label>
+          <input type="checkbox" id="gradientMode" />
+        </div>
+        <div>
+          <label for="hslMode">HSL Mode:</label>
+          <input type="checkbox" id="hslMode" />
+        </div>
+        <hr />
+        <div>
+          <label for="spiralMaxTheta">Spiral Max Theta:</label>
+          <input
+            type="range"
+            id="spiralMaxTheta"
+            min="10"
+            max="1000"
+            value="628"
+          />
+        </div>
+        <div>
+          <label for="spiralScale">Spiral Scale:</label>
+          <input type="range" id="spiralScale" min="1" max="50" value="10" />
+        </div>
+        <hr />
+        <div>
+          <label for="symmetric">Symmetric:</label>
+          <input type="checkbox" id="symmetric" />
+        </div>
+        <div>
+          <label for="organic">Organic:</label>
+          <input type="checkbox" id="organic" />
+        </div>
+        <!-- Do Clip is commented out so points can be placed freely. -->
+        <!-- <div>
+          <label for="doClip">Do Clip:</label>
+          <input type="checkbox" id="doClip" checked />
+        </div> -->
+        <div>
+          <label for="showPoints">Show Points:</label>
+          <input type="checkbox" id="showPoints" checked />
+        </div>
+        <div>
+          <label for="randomEllipse">Random Ellipse:</label>
+          <input type="checkbox" id="randomEllipse" />
+        </div>
+        <hr />
+        <div>
+          <label for="backgroundColor">Background Color:</label>
+          <input type="color" id="backgroundColor" value="#ffffff" />
+        </div>
+        <div>
+          <label for="fillColor">Fill Color:</label>
+          <input type="color" id="fillColor" value="#00ff00" />
+        </div>
+        <div>
+          <label for="lineColor">Line Color:</label>
+          <input type="color" id="lineColor" value="#000000" />
+        </div>
+        <div>
+          <button id="savePNG">Save PNG</button>
+          <button id="saveSVG">Save SVG</button>
+        </div>
+      </div>
+      <div id="legend">
+        <p>
+          • Drag the mouse to add points<br />
+          • Press '!' for random points<br />
+          • Press '1' for horizontal dots<br />
+          • Press '2' for vertical dots<br />
+          • Press 's' for spiral<br />
+          • Press 'c' or 'r' to clear canvas<br />
+        </p>
+      </div>
+    </div>
+  </body>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 22px;
+      margin: 0px;
+      padding: 0;
+    }
+
+    #controls-container {
+      position: absolute;
+      right: 10px;
+      top: 50px;
+      border: 1px solid #ccc;
+      background-color: white;
+    }
+
+    p {
+      margin: 0;
+      padding: 0;
+    }
+
+    #controls {
+      padding: 5px 10px;
+      background-color: rgba(0, 255, 0, 0.293);
+    }
+
+    #legend {
+      background-color: lime;
+      padding: 10px;
+    }
+
+    nav {
+      width: 100%;
+      background-color: yellow;
+    }
+
+    #controls label {
+      display: inline-block;
+      width: 250px;
+    }
+    #controls input[type="range"] {
+      width: 150px;
+    }
+  </style>
+</html>
