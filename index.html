@@ -10,6 +10,7 @@
 
     <script defer>
       let doShowPoints = true,
+        doShowLines = true,
         spirale = false,
         drawOrganic = false,
         drawSimmetric = false,
@@ -29,7 +30,7 @@
       let voronoi,
         diagram = null,
         bbox;
-
+      let useHatchingMode = false;
       let bDoExportSvg = false;
 
       function setup() {
@@ -59,7 +60,17 @@
         drawOrganic = document.getElementById("organic").checked;
 
         doShowPoints = document.getElementById("showPoints").checked;
+        doShowLines = document.getElementById("showLines").checked;
+
         randomEllipseEnabled = document.getElementById("randomEllipse").checked;
+
+        document
+          .getElementById("toggleHatching")
+          .addEventListener("click", () => {
+            useHatchingMode = !useHatchingMode;
+            document.getElementById("toggleHatching").innerText =
+              useHatchingMode ? "Disable Hatching " : "Enable Hatching ";
+          });
 
         bbox = { xl: 10, yt: 10, xr: 10 + adjustWidth, yb: 10 + adjustHeight };
 
@@ -99,12 +110,17 @@
         if (bDoExportSvg) {
           endRecordSVG();
           bDoExportSvg = false;
-        } 
+        }
       }
 
       function drawCellDefault(cell) {
         stroke(document.getElementById("lineColor").value);
         strokeWeight(strokedim);
+
+        if (!doShowLines) {
+          noStroke();
+        }
+
         noFill();
         beginShape();
         for (let he of cell.halfedges) {
@@ -112,14 +128,20 @@
           vertex(p.x, p.y);
         }
         endShape(CLOSE);
+
         if (doShowPoints) {
-          noStroke();
           let size = ellipsesize;
           if (randomEllipseEnabled) {
             size = cell.site.size ? cell.site.size : ellipsesize;
           }
-          fill(document.getElementById("fillColor").value);
-          ellipse(cell.site.x, cell.site.y, size, size);
+
+          if (bDoExportSvg && useHatchingMode) {
+            applyHatchingToCircle(cell.site.x, cell.site.y, size / 2);
+          } else {
+            noStroke();
+            fill(document.getElementById("fillColor").value);
+            ellipse(cell.site.x, cell.site.y, size, size);
+          }
         }
       }
 
@@ -130,6 +152,7 @@
           pts.push(createVector(p.x, p.y));
         }
         if (pts.length === 0) return;
+
         let cx = 0,
           cy = 0;
         for (let p of pts) {
@@ -138,32 +161,63 @@
         }
         cx /= pts.length;
         cy /= pts.length;
+
         let steps = gradientSteps;
-        for (let i = steps; i >= 1; i--) {
-          let t = i / steps;
-          let scaledPts = pts.map((p) =>
-            createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
-          );
-          if (HSL) {
-            colorMode(HSB, 360, 100, 100);
-            let hueVal = map(t, 0, 1, 360, 0);
-            fill(hueVal, 80, 90);
-            stroke(0);
-          } else {
-            noFill();
-            colorMode(RGB, 255, 255, 255);
-            let c1 = color(document.getElementById("fillColor").value);
-            let c2 = color(document.getElementById("lineColor").value);
-            let col = lerpColor(c1, c2, 1 - t);
-            stroke(col);
+        let hatchSpacing = 5;
+
+        if (bDoExportSvg && useHatchingMode) {
+          stroke(document.getElementById("lineColor").value);
+          if (!doShowLines) {
+            noStroke();
           }
-          beginShape();
-          for (let p of scaledPts) {
-            vertex(p.x, p.y);
+          noFill();
+
+          let bbox = getBoundingBox(pts);
+          for (let y = bbox.yMin; y <= bbox.yMax; y += hatchSpacing) {
+            let intersections = getIntersections(pts, y);
+            for (let j = 0; j < intersections.length - 1; j += 2) {
+              line(intersections[j], y, intersections[j + 1], y);
+            }
           }
-          endShape(CLOSE);
+        } else {
+          for (let i = steps; i >= 1; i--) {
+            let t = i / steps;
+            let scaledPts = pts.map((p) =>
+              createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
+            );
+
+            if (HSL) {
+              colorMode(HSB, 360, 100, 100);
+              let hueVal = map(t, 0, 1, 360, 0);
+              fill(hueVal, 80, 90);
+              stroke(0);
+              if (!doShowLines) {
+                noStroke();
+              }
+            } else {
+              noFill();
+              colorMode(RGB, 255, 255, 255);
+              let c1 = color(document.getElementById("fillColor").value);
+              let c2 = color(document.getElementById("lineColor").value);
+              let col = lerpColor(c1, c2, 1 - t);
+              stroke(col);
+              if (!doShowLines) {
+                noStroke();
+              }
+            }
+
+            beginShape();
+            for (let p of scaledPts) {
+              vertex(p.x, p.y);
+            }
+            endShape(CLOSE);
+          }
         }
+
         stroke(document.getElementById("lineColor").value);
+        if (!doShowLines) {
+          noStroke();
+        }
         noFill();
         beginShape();
         for (let p of pts) {
@@ -240,6 +294,7 @@
           pts.push(createVector(p.x, p.y));
         }
         if (pts.length === 0) return;
+
         let cx = 0,
           cy = 0;
         for (let p of pts) {
@@ -248,17 +303,20 @@
         }
         cx /= pts.length;
         cy /= pts.length;
+
         let steps = gradientSteps;
+        let lastStroke = g.strokeStyle;
+
         for (let i = steps; i >= 1; i--) {
           let t = i / steps;
           let scaledPts = pts.map((p) =>
             createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
           );
+
           if (HSL) {
             g.colorMode(HSB, 360, 100, 100);
             let hueVal = map(t, 0, 1, 360, 0);
-            g.fill(hueVal, 80, 90);
-            g.stroke(0);
+            g.stroke(hueVal, 80, 90);
           } else {
             g.noFill();
             g.colorMode(RGB, 255, 255, 255);
@@ -267,12 +325,16 @@
             let col = lerpColor(c1, c2, 1 - t);
             g.stroke(col);
           }
+
           g.beginShape();
           for (let p of scaledPts) {
             g.vertex(p.x, p.y);
           }
           g.endShape(CLOSE);
+
+          g.stroke(lastStroke);
         }
+
         g.stroke(document.getElementById("lineColor").value);
         g.noFill();
         g.beginShape();
@@ -382,14 +444,62 @@
         save(exportG, "grid.png");
       }
 
+      function applyHatchingToCircle(cx, cy, radius) {
+        let hatchSpacing = 5;
+        let xMin = cx - radius;
+        let xMax = cx + radius;
+        let yMin = cy - radius;
+        let yMax = cy + radius;
+
+        stroke(document.getElementById("lineColor").value);
+
+        for (let y = yMin; y <= yMax; y += hatchSpacing) {
+          let intersections = getCircleIntersections(cx, cy, radius, y);
+          if (intersections.length == 2) {
+            line(intersections[0], y, intersections[1], y);
+          }
+        }
+      }
+
+      function getBoundingBox(points) {
+        let xMin = Infinity,
+          xMax = -Infinity,
+          yMin = Infinity,
+          yMax = -Infinity;
+        for (let p of points) {
+          xMin = min(xMin, p.x);
+          xMax = max(xMax, p.x);
+          yMin = min(yMin, p.y);
+          yMax = max(yMax, p.y);
+        }
+        return { xMin, xMax, yMin, yMax };
+      }
+
+      function getIntersections(points, y) {
+        let intersections = [];
+        for (let i = 0; i < points.length; i++) {
+          let p1 = points[i];
+          let p2 = points[(i + 1) % points.length];
+
+          if ((p1.y <= y && p2.y >= y) || (p2.y <= y && p1.y >= y)) {
+            let x = p1.x + ((y - p1.y) * (p2.x - p1.x)) / (p2.y - p1.y);
+            intersections.push(x);
+          }
+        }
+        intersections.sort((a, b) => a - b);
+        return intersections;
+      }
+
+      function getCircleIntersections(cx, cy, radius, y) {
+        let dy = abs(y - cy);
+        if (dy > radius) return [];
+
+        let dx = sqrt(radius * radius - dy * dy);
+        return [cx - dx, cx + dx];
+      }
+
       function exportSVG() {
         bDoExportSvg = true;
-
-        // let exportG = createGraphics(adjustWidth, adjustHeight, "svg");
-        // exportG.pixelDensity(1);
-        // exportG.smooth();
-        // renderExportDrawing(exportG);
-        // exportG.save("grid.svg");
       }
     </script>
   </head>
@@ -403,7 +513,7 @@
         >Academy of Fine Arts of Bologna</a
       >, between 2017 and 2018.
       <br />
-      Now  adapted to the web.
+      Now adapted to the web.
     </nav>
     <div id="controls-container">
       <div id="controls">
@@ -476,17 +586,20 @@
           <label for="organic">Organic:</label>
           <input type="checkbox" id="organic" />
         </div>
-        <!-- Do Clip is commented out so points can be placed freely. -->
         <!-- <div>
           <label for="doClip">Do Clip:</label>
           <input type="checkbox" id="doClip" checked />
         </div> -->
         <div>
-          <label for="showPoints">Show Points:</label>
+          <label for="showPoints">Show Ellipses:</label>
           <input type="checkbox" id="showPoints" checked />
         </div>
         <div>
-          <label for="randomEllipse">Random Ellipse:</label>
+          <label for="showLines">Show Lines:</label>
+          <input type="checkbox" id="showLines" checked />
+        </div>
+        <div>
+          <label for="randomEllipse">Random Ellipses Sizes:</label>
           <input type="checkbox" id="randomEllipse" />
         </div>
         <hr />
@@ -502,6 +615,7 @@
           <label for="lineColor">Line Color:</label>
           <input type="color" id="lineColor" value="#000000" />
         </div>
+        <button id="toggleHatching">Enable Hatching</button>
         <div>
           <button id="savePNG">Save PNG</button>
           <button id="saveSVG">Save SVG</button>
