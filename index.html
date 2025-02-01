@@ -45,6 +45,7 @@
 
       function draw() {
         if (bDoExportSvg) {
+          p5plotSvg.setSVGDocumentSize(adjustWidth + 10, adjustHeight + 10);
           beginRecordSVG(this, "grid.svg");
         }
 
@@ -401,11 +402,15 @@
       }
 
       function mousePressed() {
-        let stickToGrid = !drawOrganic;
-        if (drawSimmetric) {
-          addSymmetricPoint(mouseX, mouseY, stickToGrid);
+        if (spirale) {
+          generateSpiral(mouseX, mouseY);
         } else {
-          addPoint(mouseX, mouseY, stickToGrid);
+          let stickToGrid = !drawOrganic;
+          if (drawSimmetric) {
+            addSymmetricPoint(mouseX, mouseY, stickToGrid);
+          } else {
+            addPoint(mouseX, mouseY, stickToGrid);
+          }
         }
       }
 
@@ -512,8 +517,6 @@
         rel="noopener noreferrer"
         >Academy of Fine Arts of Bologna</a
       >, between 2017 and 2018.
-      <br />
-      Now adapted to the web.
     </nav>
     <div id="controls-container">
       <div id="controls">
@@ -530,22 +533,22 @@
           <input type="range" id="ellipseSize" min="1" max="100" value="10" />
         </div>
         <div>
-          <label for="drawingWidth">Drawing Area Width:</label>
+          <label for="drawingWidth">Width:</label>
           <input
             type="range"
             id="drawingWidth"
             min="50"
-            max="650"
+            max="1024"
             value="650"
           />
         </div>
         <div>
-          <label for="drawingHeight">Drawing Area Height:</label>
+          <label for="drawingHeight">Height:</label>
           <input
             type="range"
             id="drawingHeight"
             min="50"
-            max="920"
+            max="1024"
             value="920"
           />
         </div>
@@ -604,15 +607,15 @@
         </div>
         <hr />
         <div>
-          <label for="backgroundColor">Background Color:</label>
+          <label for="backgroundColor">Background:</label>
           <input type="color" id="backgroundColor" value="#ffffff" />
         </div>
         <div>
-          <label for="fillColor">Fill Color:</label>
+          <label for="fillColor">Fill:</label>
           <input type="color" id="fillColor" value="#00ff00" />
         </div>
         <div>
-          <label for="lineColor">Line Color:</label>
+          <label for="lineColor">Line:</label>
           <input type="color" id="lineColor" value="#000000" />
         </div>
         <button id="toggleHatching">Enable Hatching</button>
@@ -636,7 +639,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      font-size: 22px;
+      font-size: 18px;
       margin: 0px;
       padding: 0;
     }
@@ -651,7 +654,7 @@
       bottom: 10px;
       border: 1px solid #ccc;
       background-color: white;
-      max-width: 500px;
+      max-width: 600px;
     }
 
     p {
