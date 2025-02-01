@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=595, height=842, initial-scale=1.0" />
     <title>.-':_,^=;+!r</title>
     <script src="p5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js-svg/1.0.1/p5.svg.min.js"></script>
     <script src="voronoi.js"></script>
+    <script src="p5.plotSvg.js"></script>
 
     <script defer>
       let doShowPoints = true,
@@ -30,8 +30,10 @@
         diagram = null,
         bbox;
 
+      let bDoExportSvg = false;
+
       function setup() {
-        createCanvas(innerWidth, innerHeight * 1.2, "svg");
+        createCanvas(innerWidth, innerHeight * 1.2);
         pixelDensity(1);
         smooth();
 
@@ -41,6 +43,10 @@
       }
 
       function draw() {
+        if (bDoExportSvg) {
+          beginRecordSVG(this, "grid.svg");
+        }
+
         gridSize = Number(document.getElementById("gridSize").value);
         strokedim = Number(document.getElementById("strokeWeight").value);
         ellipsesize = Number(document.getElementById("ellipseSize").value);
@@ -90,6 +96,10 @@
             }
           }
         }
+        if (bDoExportSvg) {
+          endRecordSVG();
+          bDoExportSvg = false;
+        } 
       }
 
       function drawCellDefault(cell) {
@@ -373,11 +383,13 @@
       }
 
       function exportSVG() {
-        let exportG = createGraphics(adjustWidth, adjustHeight, "svg");
-        exportG.pixelDensity(1);
-        exportG.smooth();
-        renderExportDrawing(exportG);
-        save(exportG, "grid.svg");
+        bDoExportSvg = true;
+
+        // let exportG = createGraphics(adjustWidth, adjustHeight, "svg");
+        // exportG.pixelDensity(1);
+        // exportG.smooth();
+        // renderExportDrawing(exportG);
+        // exportG.save("grid.svg");
       }
     </script>
   </head>
@@ -389,7 +401,9 @@
         target="_blank"
         rel="noopener noreferrer"
         >Academy of Fine Arts of Bologna</a
-      >
+      >, in 2019.
+      <br />
+      Now adapted to the web.
     </nav>
     <div id="controls-container">
       <div id="controls">
@@ -425,6 +439,7 @@
             value="920"
           />
         </div>
+        <hr />
         <div>
           <label for="gradientSteps">Gradient Steps:</label>
           <input type="range" id="gradientSteps" min="2" max="20" value="10" />
@@ -512,12 +527,17 @@
       padding: 0;
     }
 
+    a {
+      color: blue;
+    }
+
     #controls-container {
       position: absolute;
       right: 10px;
-      top: 50px;
+      top: 10px;
       border: 1px solid #ccc;
       background-color: white;
+      max-width: 500px;
     }
 
     p {
@@ -537,6 +557,7 @@
 
     nav {
       width: 100%;
+      padding: 5px;
       background-color: yellow;
     }
 
