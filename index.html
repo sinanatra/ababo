@@ -416,25 +416,116 @@
 
       function keyPressed() {
         if (key === "!") {
-          for (let k = 0; k < width; k += gridSize) {
-            addPoint(k, random(100, 400));
-            addPoint(k, random(350, 400));
-            addPoint(k, random(350, 650));
+          for (let y = bbox.yt; y < bbox.yb; y += gridSize * 6) {
+            for (let x = bbox.xl; x < bbox.xr; x += gridSize * 6) {
+              if (random() > 0.5) addPoint(x, y);
+            }
           }
         }
+
         if (key === "1") {
-          for (let k = 0; k < width; k += gridSize) {
+          for (let k = 0; k < width; k += gridSize * 6) {
             addPoint(k, bbox.yt + adjustHeight - gridSize);
           }
         }
+
         if (key === "2") {
-          for (let k = 0; k < height; k += gridSize) {
+          for (let k = 0; k < height; k += gridSize * 6) {
             addPoint(bbox.xl + adjustWidth - gridSize, k);
           }
         }
+
+        if (key === "3") {
+          for (let k = 0; k < adjustWidth; k += gridSize * 6) {
+            addPoint(bbox.xl + k, bbox.yt);
+          }
+        }
+
+        if (key === "4") {
+          for (let k = 0; k < adjustHeight; k += gridSize * 6) {
+            addPoint(bbox.xl, bbox.yt + k);
+          }
+        }
+
+        if (key === "5") {
+          for (let x = 0; x < adjustWidth; x += gridSize) {
+            let f = map(sin(PI * (x / adjustWidth)), -1, 1, 0.5, 1.5);
+
+            let spacing = gridSize * 6 * f;
+            for (let y = 0; y < adjustHeight; y += spacing) {
+              addPoint(bbox.xl + x, bbox.yt + y);
+            }
+          }
+        }
+        if (key === "6") {
+          let frequency = 0.03;
+          let amplitude = gridSize * 1.5;
+          for (let x = 0; x < adjustWidth; x += gridSize * 4) {
+            for (let y = 0; y < adjustHeight; y += gridSize * 2) {
+              let n = noise(x * 0.05, y * 0.05);
+              let offset = amplitude * sin(x * frequency + n * TWO_PI);
+              addPoint(bbox.xl + x, bbox.yt + y + offset);
+            }
+          }
+        }
+
+        if (key === "7") {
+          for (let x = 0; x < adjustWidth; x += gridSize) {
+            for (let y = 0; y < adjustHeight; y += gridSize * 6) {
+              let noiseX = map(
+                noise(x * 0.1, y * 0.1),
+                0,
+                1,
+                -gridSize / 2,
+                gridSize / 2
+              );
+              let noiseY = map(
+                noise(x * 0.1 + 100, y * 0.1 + 100),
+                0,
+                1,
+                -gridSize / 2,
+                gridSize / 2
+              );
+              addPoint(bbox.xl + x + noiseX, bbox.yt + y + noiseY);
+            }
+          }
+        }
+
+        if (key === "8") {
+          let frequency = 0.1;
+          let amplitude = gridSize * 1.5;
+          for (let x = 0; x < adjustWidth; x += gridSize) {
+            for (let y = 0; y < adjustHeight; y += gridSize * 6) {
+              let offset = amplitude * sin(frequency * x);
+              addPoint(bbox.xl + x, bbox.yt + y + offset);
+            }
+          }
+        }
+        if (key === "9") {
+          for (let x = 0; x < adjustWidth; x += gridSize / 2) {
+            for (let y = 0; y < adjustHeight; y += gridSize * 6) {
+              let factor = map(x + y, 0, adjustWidth + adjustHeight, 0.5, 2);
+              addPoint(bbox.xl + x * factor, bbox.yt + y * factor);
+            }
+          }
+        }
+        if (key === "0") {
+          for (let x = 0; x < adjustWidth; x += gridSize) {
+            for (let y = 0; y < adjustHeight; y += gridSize * 6) {
+              if (random() > 0.6) {
+                let n = noise(x * 0.1, y * 0.1);
+                let offsetX = map(n, 0, 1, -gridSize, gridSize);
+                let offsetY = map(n, 0, 1, -gridSize, gridSize);
+                addPoint(bbox.xl + x + offsetX, bbox.yt + y + offsetY);
+              }
+            }
+          }
+        }
+
         if (key === "s") {
           generateSpiral(mouseX, mouseY);
         }
+
         if (key === "c" || key === "r") {
           sites = [];
           background(255);
@@ -522,7 +613,7 @@
       <div id="controls">
         <div>
           <label for="gridSize">Grid Size:</label>
-          <input type="range" id="gridSize" min="10" max="130" value="15" />
+          <input type="range" id="gridSize" min="2" max="50" value="15" />
         </div>
         <div>
           <label for="strokeWeight">Stroke Weight:</label>
@@ -628,8 +719,14 @@
         <p>
           Drag the mouse to add points<br />
           Press '!' for random points<br />
-          Press '1' for horizontal dots<br />
-          Press '2' for vertical dots<br />
+          Press '1/3' for horizontal dots<br />
+          Press '2/4' for vertical dots<br />
+          Press '5' for sinusoidal<br />
+          Press '6' for marble grid<br />
+          Press '7' for noise pattern<br />
+          Press '8' for wave pattern<br />
+          Press '9' for diagonal scaling<br />
+          Press '0' for noise field<br />
           Press 's' for spiral<br />
           Press 'c' or 'r' to clear canvas<br />
         </p>
@@ -670,6 +767,7 @@
     #legend {
       background-color: lime;
       padding: 10px;
+      font-size: 0.875rem;
     }
 
     nav {
