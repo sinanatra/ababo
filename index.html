@@ -69,6 +69,10 @@
 
         doShowPoints = document.getElementById("showPoints").checked;
         doShowLines = document.getElementById("showLines").checked;
+        let hatchDensity = Number(
+          document.getElementById("hatchDensity").value
+        );
+        hatchSpacing = map(hatchDensity, 1, 20, 20, 2);
 
         bbox = { xl: 10, yt: 10, xr: 10 + adjustWidth, yb: 10 + adjustHeight };
 
@@ -129,12 +133,14 @@
 
         if (doShowPoints) {
           let size = ellipsesize;
-          if (randomEllipseEnabled) {
-            size = cell.site.size ? cell.site.size : ellipsesize;
-          }
 
           if (useHatchingMode) {
-            applyHatchingToCircle(cell.site.x, cell.site.y, size / 2);
+            applyHatchingToCircle(
+              cell.site.x,
+              cell.site.y,
+              size / 2,
+              hatchSpacing
+            );
           } else {
             noStroke();
             fill(document.getElementById("fillColor").value);
@@ -144,47 +150,14 @@
       }
 
       function drawCellGradientDefault(cell) {
-        let pts = [];
-        for (let he of cell.halfedges) {
-          let p = he.getStartpoint();
-          pts.push(createVector(p.x, p.y));
-        }
-        if (pts.length === 0) return;
-
-        let cx = 0,
-          cy = 0;
-        for (let p of pts) {
-          cx += p.x;
-          cy += p.y;
-        }
-        cx /= pts.length;
-        cy /= pts.length;
-
         let steps = gradientSteps;
-        let hatchSpacing = 5;
 
         for (let i = steps; i >= 1; i--) {
-          let t = i / steps;
-
-          let scaledPts = pts.map((p) =>
-            createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
-          );
-
-          let stepColor;
-          if (HSL) {
-            colorMode(HSB, 360, 100, 100);
-            let hueVal = map(t, 0, 1, 360, 0);
-            stepColor = color(hueVal, 80, 90);
-          } else {
-            colorMode(RGB, 255, 255, 255);
-            let c1 = color(document.getElementById("fillColor").value);
-            let c2 = color(document.getElementById("lineColor").value);
-            stepColor = lerpColor(c1, c2, 1 - t);
-          }
-
           if (useHatchingMode) {
             noFill();
             stroke(stepColor);
+            strokeWeight(strokedim);
+
             let polyBbox = getBoundingBox(scaledPts);
             for (let y = polyBbox.yMin; y <= polyBbox.yMax; y += hatchSpacing) {
               let intersections = getIntersections(scaledPts, y);
@@ -193,44 +166,20 @@
               }
             }
           } else {
-            noStroke();
-            fill(stepColor);
-            beginShape();
-            for (let p of scaledPts) {
-              vertex(p.x, p.y);
-            }
-            endShape(CLOSE);
           }
-        }
-
-        if (doShowLines) {
-          stroke(document.getElementById("lineColor").value);
-          noFill();
-          beginShape();
-          for (let p of pts) {
-            vertex(p.x, p.y);
-          }
-          endShape(CLOSE);
         }
       }
 
       function renderExportDrawing(g) {
+        doShowPoints = document.getElementById("showPoints").checked;
+        doShowLines = document.getElementById("showLines").checked;
+
         let bboxExport = { xl: 0, yt: 0, xr: adjustWidth, yb: adjustHeight };
 
         g.colorMode(RGB, 255, 255, 255);
 
         let bgHex = document.getElementById("backgroundColor").value;
         g.background(bgHex);
-        g.push();
-        g.noStroke();
-        g.fill(bgHex);
-        g.rect(bboxExport.xl, bboxExport.yt, adjustWidth, adjustHeight);
-        g.pop();
-
-        let lineHex = document.getElementById("lineColor").value;
-        g.stroke(lineHex);
-        g.noFill();
-        g.rect(bboxExport.xl, bboxExport.yt, adjustWidth, adjustHeight);
 
         let exportSites = sites.map((s) => ({
           x: s.x - 50,
@@ -238,6 +187,7 @@
           size: s.size,
         }));
         let exportDiagram = voronoi.compute(exportSites, bboxExport);
+
         if (exportSites.length > 0) {
           if (gradientMode) {
             for (let cell of exportDiagram.cells) {
@@ -271,20 +221,21 @@
         cy /= pts.length;
 
         let steps = gradientSteps;
-        let lastStroke = g.strokeStyle;
+        let hatchDensity = Number(
+          document.getElementById("hatchDensity").value
+        );
+        let hatchSpacing = map(hatchDensity, 1, 20, 20, 2);
 
         for (let i = steps; i >= 1; i--) {
           let t = i / steps;
           let scaledPts = pts.map((p) =>
             createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
           );
-
           let hexCol;
           if (HSL) {
             colorMode(HSB, 360, 100, 100);
             let hueVal = map(t, 0, 1, 360, 0);
             let colHSB = color(hueVal, 80, 90);
-
             colorMode(RGB, 255, 255, 255);
             let r = floor(red(colHSB));
             let gVal = floor(green(colHSB));
@@ -301,24 +252,38 @@
             hexCol = "#" + hex(r, 2) + hex(gVal, 2) + hex(b, 2);
             g.stroke(hexCol);
           }
+          g.strokeWeight(strokedim);
 
+          if (useHatchingMode) {
+            g.noFill();
+            let polyBbox = getBoundingBox(scaledPts);
+            for (let y = polyBbox.yMin; y <= polyBbox.yMax; y += hatchSpacing) {
+              let intersections = getIntersections(scaledPts, y);
+              for (let j = 0; j < intersections.length - 1; j += 2) {
+                g.line(intersections[j], y, intersections[j + 1], y);
+              }
+            }
+          } else {
+            g.noStroke();
+            g.fill(hexCol);
+            g.beginShape();
+            for (let p of scaledPts) {
+              g.vertex(p.x, p.y);
+            }
+            g.endShape(CLOSE);
+          }
+        }
+
+        if (doShowLines) {
+          g.stroke(document.getElementById("lineColor").value);
+          g.strokeWeight(strokedim);
           g.noFill();
           g.beginShape();
-          for (let p of scaledPts) {
+          for (let p of pts) {
             g.vertex(p.x, p.y);
           }
           g.endShape(CLOSE);
-
-          g.stroke(lastStroke);
         }
-
-        g.stroke(document.getElementById("lineColor").value);
-        g.noFill();
-        g.beginShape();
-        for (let p of pts) {
-          g.vertex(p.x, p.y);
-        }
-        g.endShape(CLOSE);
       }
 
       function addPoint(x, y, stickToGrid = true) {
@@ -504,8 +469,7 @@
         save(exportG, "grid.png");
       }
 
-      function applyHatchingToCircle(cx, cy, radius) {
-        let hatchSpacing = 5;
+      function applyHatchingToCircle(cx, cy, radius, hatchSpacing) {
         let xMin = cx - radius;
         let xMax = cx + radius;
         let yMin = cy - radius;
@@ -675,7 +639,13 @@
           <label for="lineColor">Line:</label>
           <input type="color" id="lineColor" value="#000000" />
         </div>
-        <button id="toggleHatching">Enable Hatching</button>
+        <div>
+          <label for="hatchDensity">Hatch Density:</label>
+          <input type="range" id="hatchDensity" min="1" max="20" value="5" />
+        </div>
+        <div>
+          <button id="toggleHatching">Enable Hatching</button>
+        </div>
         <div>
           <button id="savePNG">Save PNG</button>
           <button id="saveSVG">Save SVG</button>
@@ -702,7 +672,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      font-size: 20px;
+      font-size: 18px;
       margin: 0px;
       padding: 0;
     }
