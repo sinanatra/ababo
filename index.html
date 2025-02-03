@@ -190,6 +190,7 @@
             let c2 = color(document.getElementById("lineColor").value);
             stepColor = lerpColor(c1, c2, 1 - t);
           }
+        
 
           if (useHatchingMode) {
             noFill();
@@ -571,7 +572,7 @@
   </head>
   <body>
     <nav>
-      A toolkit to draw posters, originally designed for the
+      A tool to draw posters, originally designed for the redesign of the
       <a
         href="https://giacomo.website/ababo"
         target="_blank"
@@ -625,7 +626,7 @@
         <hr />
         <div>
           <label for="gradientSteps">Gradient Steps:</label>
-          <input type="range" id="gradientSteps" min="2" max="20" value="10" />
+          <input type="range" id="gradientSteps" min="2" max="50" value="10" />
         </div>
         <div>
           <label for="gradientMode">Gradient Mode:</label>
