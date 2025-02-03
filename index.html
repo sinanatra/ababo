@@ -72,7 +72,7 @@
         let hatchDensity = Number(
           document.getElementById("hatchDensity").value
         );
-        hatchSpacing = map(hatchDensity, 1, 20, 20, 2);
+        hatchSpacing = map(hatchDensity, 1, 20, 20, 1);
 
         bbox = { xl: 10, yt: 10, xr: 10 + adjustWidth, yb: 10 + adjustHeight };
 
@@ -173,6 +173,14 @@
       function renderExportDrawing(g) {
         doShowPoints = document.getElementById("showPoints").checked;
         doShowLines = document.getElementById("showLines").checked;
+        if (doShowLines) {
+          g.stroke(document.getElementById("lineColor").value);
+          g.strokeWeight(strokedim);
+          g.noFill();
+          g.rect(0, 0, adjustWidth, adjustHeight);
+        } else {
+          g.noStroke();
+        }
 
         let bboxExport = { xl: 0, yt: 0, xr: adjustWidth, yb: adjustHeight };
 
@@ -203,89 +211,54 @@
         }
       }
 
+      function drawCellOnContext(cell, g) {
+        // Gather vertices
+        let pts = [];
+        for (let he of cell.halfedges) {
+          let p = he.getStartpoint();
+          pts.push({ x: p.x, y: p.y });
+        }
+        if (pts.length === 0) return;
+
+        // Outline logic
+        if (doShowLines) {
+          let lColor = document.getElementById("lineColor").value;
+          g.stroke(lColor);
+          g.strokeWeight(strokedim);
+        } else {
+          g.noStroke();
+        }
+
+        g.noFill();
+        g.beginShape();
+        for (let p of pts) {
+          g.vertex(p.x, p.y);
+        }
+        g.endShape(CLOSE);
+      }
+
       function drawCellGradientOnContext(cell, g) {
         let pts = [];
         for (let he of cell.halfedges) {
           let p = he.getStartpoint();
-          pts.push(createVector(p.x, p.y));
+          pts.push({ x: p.x, y: p.y });
         }
         if (pts.length === 0) return;
-
-        let cx = 0,
-          cy = 0;
-        for (let p of pts) {
-          cx += p.x;
-          cy += p.y;
-        }
-        cx /= pts.length;
-        cy /= pts.length;
-
-        let steps = gradientSteps;
-        let hatchDensity = Number(
-          document.getElementById("hatchDensity").value
-        );
-        let hatchSpacing = map(hatchDensity, 1, 20, 20, 2);
-
-        for (let i = steps; i >= 1; i--) {
-          let t = i / steps;
-          let scaledPts = pts.map((p) =>
-            createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
-          );
-          let hexCol;
-          if (HSL) {
-            colorMode(HSB, 360, 100, 100);
-            let hueVal = map(t, 0, 1, 360, 0);
-            let colHSB = color(hueVal, 80, 90);
-            colorMode(RGB, 255, 255, 255);
-            let r = floor(red(colHSB));
-            let gVal = floor(green(colHSB));
-            let b = floor(blue(colHSB));
-            hexCol = "#" + hex(r, 2) + hex(gVal, 2) + hex(b, 2);
-            g.stroke(hexCol);
-          } else {
-            let c1 = color(document.getElementById("fillColor").value);
-            let c2 = color(document.getElementById("lineColor").value);
-            let colRGB = lerpColor(c1, c2, 1 - t);
-            let r = floor(red(colRGB));
-            let gVal = floor(green(colRGB));
-            let b = floor(blue(colRGB));
-            hexCol = "#" + hex(r, 2) + hex(gVal, 2) + hex(b, 2);
-            g.stroke(hexCol);
-          }
-          g.strokeWeight(strokedim);
-
-          if (useHatchingMode) {
-            g.noFill();
-            let polyBbox = getBoundingBox(scaledPts);
-            for (let y = polyBbox.yMin; y <= polyBbox.yMax; y += hatchSpacing) {
-              let intersections = getIntersections(scaledPts, y);
-              for (let j = 0; j < intersections.length - 1; j += 2) {
-                g.line(intersections[j], y, intersections[j + 1], y);
-              }
-            }
-          } else {
-            g.noStroke();
-            g.fill(hexCol);
-            g.beginShape();
-            for (let p of scaledPts) {
-              g.vertex(p.x, p.y);
-            }
-            g.endShape(CLOSE);
-          }
-        }
 
         if (doShowLines) {
           g.stroke(document.getElementById("lineColor").value);
           g.strokeWeight(strokedim);
-          g.noFill();
-          g.beginShape();
-          for (let p of pts) {
-            g.vertex(p.x, p.y);
-          }
-          g.endShape(CLOSE);
+        } else {
+          g.noStroke();
         }
-      }
+        g.noFill();
 
+        g.beginShape();
+        for (let p of pts) {
+          g.vertex(p.x, p.y);
+        }
+        g.endShape(CLOSE);
+      }
       function addPoint(x, y, stickToGrid = true) {
         let pt = createVector(x, y);
         if (stickToGrid) {
@@ -438,18 +411,6 @@
             }
           }
         }
-        if (key === "8") {
-          for (let x = 0; x < adjustWidth; x += gridSize) {
-            for (let y = 0; y < adjustHeight; y += gridSize * 6) {
-              if (random() > 0.6) {
-                let n = noise(x * 0.1, y * 0.1);
-                let offsetX = map(n, 0, 1, -gridSize, gridSize);
-                let offsetY = map(n, 0, 1, -gridSize, gridSize);
-                addPoint(bbox.xl + x + offsetX, bbox.yt + y + offsetY);
-              }
-            }
-          }
-        }
 
         if (key === "s") {
           generateSpiral(mouseX, mouseY);
@@ -475,7 +436,8 @@
         let yMin = cy - radius;
         let yMax = cy + radius;
 
-        stroke(document.getElementById("lineColor").value);
+        // stroke(document.getElementById("lineColor").value);
+        stroke(document.getElementById("fillColor").value);
 
         for (let y = yMin; y <= yMax; y += hatchSpacing) {
           let intersections = getCircleIntersections(cx, cy, radius, y);
@@ -557,7 +519,7 @@
         </div>
         <div>
           <label for="ellipseSize">Ellipse Size:</label>
-          <input type="range" id="ellipseSize" min="1" max="100" value="10" />
+          <input type="range" id="ellipseSize" min="1" max="100" value="15" />
         </div>
 
         <div>
@@ -641,7 +603,7 @@
         </div>
         <div>
           <label for="hatchDensity">Hatch Density:</label>
-          <input type="range" id="hatchDensity" min="1" max="20" value="5" />
+          <input type="range" id="hatchDensity" min="10" max="20" value="18" />
         </div>
         <div>
           <button id="toggleHatching">Enable Hatching</button>
@@ -662,7 +624,6 @@
           Press '5' for noise pattern<br />
           Press '6' for wave pattern<br />
           Press '7' for diagonal scaling<br />
-          Press '8' for noise field<br />
           Press 's' for spiral based on the mouse pos<br />
           Press 'c' or 'r' to clear canvas<br />
         </p>
