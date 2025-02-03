@@ -190,7 +190,6 @@
             let c2 = color(document.getElementById("lineColor").value);
             stepColor = lerpColor(c1, c2, 1 - t);
           }
-        
 
           if (useHatchingMode) {
             noFill();
@@ -683,15 +682,23 @@
           <input type="color" id="lineColor" value="#000000" />
         </div>
         <div>
-          <label for="hatchDensity">Hatch Density:</label>
-          <input type="range" id="hatchDensity" min="10" max="20" value="18" />
-        </div>
-        <div>
-          <button id="toggleHatching">Enable Hatching</button>
-        </div>
-        <div>
           <button id="savePNG">Save PNG</button>
           <button id="saveSVG">Save SVG</button>
+        </div>
+        <hr />
+        <div>
+          <label for="toggleHatching"> For Pen Plotting:</label>
+          <button id="toggleHatching">Enable Hatching</button>
+          <div>
+            <label for="hatchDensity">Hatch Density:</label>
+            <input
+              type="range"
+              id="hatchDensity"
+              min="10"
+              max="20"
+              value="18"
+            />
+          </div>
         </div>
       </div>
       <div id="legend">
