@@ -42,6 +42,9 @@
         document.getElementById("savePNG").addEventListener("click", exportPNG);
         document.getElementById("saveSVG").addEventListener("click", exportSVG);
         document
+          .getElementById("saveGCODE")
+          .addEventListener("click", exportGCode);
+        document
           .getElementById("toggleHatching")
           .addEventListener("click", () => {
             useHatchingMode = !useHatchingMode;
@@ -567,6 +570,205 @@
       function exportSVG() {
         bDoExportSvg = true;
       }
+
+      function exportGCode() {
+        if (!diagram || !diagram.cells) return;
+
+        let paths = {
+          lines: [],
+          dots: [],
+          gradient: [],
+        };
+
+        let hatchDensity = Number(
+          document.getElementById("hatchDensity").value
+        );
+
+        let hatchSpacing = gradientMode
+          ? map(hatchDensity, 1, 20, 20, 2)
+          : map(hatchDensity, 1, 20, 20, 1);
+
+        if (!gradientMode) {
+          for (let cell of diagram.cells) {
+            if (!cell.halfedges || cell.halfedges.length === 0) continue;
+
+            if (doShowLines) {
+              let outline = [];
+              for (let he of cell.halfedges) {
+                let p = he.getStartpoint();
+                outline.push({ x: p.x, y: p.y });
+              }
+              if (outline.length > 0) {
+                outline.push(outline[0]);
+                paths.lines.push(outline);
+              }
+            }
+
+            if (doShowPoints) {
+              let cx = cell.site.x;
+              let cy = cell.site.y;
+              let radius = ellipsesize / 2;
+              if (useHatchingMode) {
+                for (let y = cy - radius; y <= cy + radius; y += hatchSpacing) {
+                  let inters = getCircleIntersections(cx, cy, radius, y);
+                  if (inters.length === 2) {
+                    paths.dots.push([
+                      { x: inters[0], y: y },
+                      { x: inters[1], y: y },
+                    ]);
+                  }
+                }
+              } else {
+                let steps = 20;
+                let circlePath = [];
+                for (let i = 0; i <= steps; i++) {
+                  let theta = (TWO_PI * i) / steps;
+                  let x = cx + radius * cos(theta);
+                  let y = cy + radius * sin(theta);
+                  circlePath.push({ x, y });
+                }
+                paths.dots.push(circlePath);
+              }
+            }
+          }
+        } else {
+          for (let cell of diagram.cells) {
+            if (!cell.halfedges || cell.halfedges.length === 0) continue;
+
+            let pts = [];
+            for (let he of cell.halfedges) {
+              let p = he.getStartpoint();
+              pts.push(createVector(p.x, p.y));
+            }
+            if (pts.length === 0) continue;
+
+            let cx = 0,
+              cy = 0;
+            pts.forEach((p) => {
+              cx += p.x;
+              cy += p.y;
+            });
+            cx /= pts.length;
+            cy /= pts.length;
+
+            let steps = gradientSteps;
+
+            for (let i = steps; i >= 1; i--) {
+              let t = i / steps;
+              let scaledPts = pts.map((p) =>
+                createVector(cx + (p.x - cx) * t, cy + (p.y - cy) * t)
+              );
+              if (useHatchingMode) {
+                let bb = getBoundingBox(scaledPts);
+                for (let y = bb.yMin; y <= bb.yMax; y += hatchSpacing) {
+                  let intersections = getIntersections(scaledPts, y);
+                  for (let j = 0; j < intersections.length - 1; j += 2) {
+                    paths.gradient.push([
+                      { x: intersections[j], y: y },
+                      { x: intersections[j + 1], y: y },
+                    ]);
+                  }
+                }
+              } else {
+                let poly = scaledPts.map((p) => ({ x: p.x, y: p.y }));
+                poly.push(poly[0]);
+                paths.gradient.push(poly);
+              }
+            }
+
+            if (doShowLines) {
+              let outline = pts.map((p) => ({ x: p.x, y: p.y }));
+              outline.push(outline[0]);
+              paths.lines.push(outline);
+            }
+          }
+        }
+
+        function generateGCodeFile(layerPaths, color, type) {
+          let gcode = [];
+
+          gcode.push("; G-code for " + type + " (color " + color + ")");
+          gcode.push("G21 ; Set units to millimeters");
+          gcode.push("G90 ; Use absolute positioning");
+          gcode.push("M5 ; Ensure pen is up");
+
+          let xMin = Infinity,
+            yMin = Infinity,
+            xMax = -Infinity,
+            yMax = -Infinity;
+          for (let path of layerPaths) {
+            for (let pt of path) {
+              xMin = Math.min(xMin, pt.x);
+              yMin = Math.min(yMin, pt.y);
+              xMax = Math.max(xMax, pt.x);
+              yMax = Math.max(yMax, pt.y);
+            }
+          }
+          let drawingWidth = xMax - xMin;
+          let drawingHeight = yMax - yMin;
+
+          const maxWidthMM = 205;
+          const maxHeightMM = 290;
+
+          let pxToMm = 0.2646;
+          let scale = Math.min(
+            maxWidthMM / (drawingWidth * pxToMm),
+            maxHeightMM / (drawingHeight * pxToMm)
+          );
+
+          let offsetX = -xMin;
+          let offsetY = -yMin;
+
+          layerPaths.forEach((path) => {
+            if (path.length === 0) return;
+            let start = path[0];
+            let sx = ((start.x + offsetX) * scale * pxToMm).toFixed(2);
+            let sy = ((start.y + offsetY) * scale * pxToMm).toFixed(2);
+            gcode.push(`G0 X${sx} Y${sy}`);
+            gcode.push("M3 S1000 ; Pen down");
+
+            for (let i = 1; i < path.length; i++) {
+              let px = ((path[i].x + offsetX) * scale * pxToMm).toFixed(2);
+              let py = ((path[i].y + offsetY) * scale * pxToMm).toFixed(2);
+              gcode.push(`G1 X${px} Y${py} F1000`);
+            }
+
+            gcode.push("G4 P0.2 ; Delay before pen up");
+            gcode.push("M5 ; Pen up");
+          });
+
+          let blob = new Blob([gcode.join("\n")], { type: "text/plain" });
+          let url = URL.createObjectURL(blob);
+          let a = document.createElement("a");
+          a.href = url;
+
+          a.download = `drawing_${type}-${color.replace("#", "")}.gcode`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        if (paths.lines.length > 0) {
+          generateGCodeFile(
+            paths.lines,
+            document.getElementById("lineColor").value,
+            "lines"
+          );
+        }
+        if (paths.dots.length > 0) {
+          generateGCodeFile(
+            paths.dots,
+            document.getElementById("fillColor").value,
+            "dots"
+          );
+        }
+        if (paths.gradient.length > 0) {
+          generateGCodeFile(
+            paths.gradient,
+            document.getElementById("fillColor").value,
+            "gradient"
+          );
+        }
+      }
     </script>
   </head>
   <body>
@@ -684,6 +886,7 @@
         <div>
           <button id="savePNG">Save PNG</button>
           <button id="saveSVG">Save SVG</button>
+          <button id="saveGCODE">Save G-code</button>
         </div>
         <hr />
         <div>
