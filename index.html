@@ -8,6 +8,41 @@
     <script src="voronoi.js"></script>
     <script src="p5.plotSvg.js"></script>
 
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="Ababo" />
+    <meta
+      name="description"
+      content="A tool to draw posters, originally designed for the redesign of the Academy of Fine Arts of Bologna, between 2017 and 2018."
+    />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ababo.giacomo.website/" />
+    <meta property="og:title" content="Ababo" />
+    <meta
+      property="og:description"
+      content="A tool to draw posters, originally designed for the redesign of the Academy of Fine Arts of Bologna, between 2017 and 2018."
+    />
+    <meta
+      property="og:image"
+      content="https://ababo.giacomo.website/cover.png"
+    />
+
+    <!-- X (Twitter) -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://ababo.giacomo.website/" />
+    <meta property="twitter:title" content="Ababo" />
+    <meta
+      property="twitter:description"
+      content="A tool to draw posters, originally designed for the redesign of the Academy of Fine Arts of Bologna, between 2017 and 2018."
+    />
+    <meta
+      property="twitter:image"
+      content="https://ababo.giacomo.website/cover.png"
+    />
+
+    <!-- Meta Tags Generated with https://metatags.io -->
+
     <script defer>
       let doShowPoints = true,
         doShowLines = true,
@@ -707,8 +742,8 @@
           let drawingWidth = xMax - xMin;
           let drawingHeight = yMax - yMin;
 
-          const maxWidthMM = 205;
-          const maxHeightMM = 290;
+          const maxWidthMM = 290;
+          const maxHeightMM = 205;
 
           let pxToMm = 0.2646;
           let scale = Math.min(
@@ -725,15 +760,15 @@
             let sx = ((start.x + offsetX) * scale * pxToMm).toFixed(2);
             let sy = ((start.y + offsetY) * scale * pxToMm).toFixed(2);
             gcode.push(`G0 X${sx} Y${sy}`);
-            gcode.push("M3 S1000 ; Pen down");
+            gcode.push("M3 S1500 ; Pen down");
 
             for (let i = 1; i < path.length; i++) {
               let px = ((path[i].x + offsetX) * scale * pxToMm).toFixed(2);
               let py = ((path[i].y + offsetY) * scale * pxToMm).toFixed(2);
-              gcode.push(`G1 X${px} Y${py} F1000`);
+              gcode.push(`G1 X${px} Y${py} F10000`);
             }
 
-            gcode.push("G4 P0.2 ; Delay before pen up");
+            gcode.push("G4 P0.5 ; Delay before pen up");
             gcode.push("M5 ; Pen up");
           });
 
